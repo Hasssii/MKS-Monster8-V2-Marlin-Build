@@ -27,9 +27,11 @@ jobs:
 
       - name: Copy Custom Bootscreen
         run: |
-          cp user-repo/_Bootscreen.h Marlin/Marlin/_Bootscreen.h
+          # In modern Marlin, _Bootscreen.h goes in Marlin/src/lcd/dogm/
+          mkdir -p Marlin/Marlin/src/lcd/dogm
+          cp user-repo/_Bootscreen.h Marlin/Marlin/src/lcd/dogm/_Bootscreen.h
           echo "✅ Custom HASSI bootscreen copied"
-          ls -la Marlin/Marlin/_Bootscreen.h
+          ls -la Marlin/Marlin/src/lcd/dogm/_Bootscreen.h
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -46,17 +48,14 @@ jobs:
           cd Marlin/Marlin
           
           echo "=== BEFORE: Current settings ==="
-          grep -n "MOTHERBOARD\|TEMP_SENSOR\|X_BED_SIZE\|Y_BED_SIZE" Configuration.h | head -10
+          grep -n "MOTHERBOARD\|TEMP_SENSOR\|X_BED_SIZE\|Y_BED_SIZE\|HEATER.*MAXTEMP" Configuration.h | head -15
           
           # ===== BOARD & SERIAL =====
           sed -i 's/^[[:space:]]*#define MOTHERBOARD.*/#define MOTHERBOARD BOARD_MKS_MONSTER8_V2/' Configuration.h
           sed -i 's/^[[:space:]]*#define SERIAL_PORT.*/#define SERIAL_PORT -1/' Configuration.h
           sed -i 's/^[[:space:]]*\/\/#define SERIAL_PORT_2.*/#define SERIAL_PORT_2 1/' Configuration.h
           
-          # ===== PRINTER TYPE (Cartesian for bioprinter) =====
-          # Keep Cartesian - no COREXY for standard bioprinter
-          
-          # ===== BED SIZE: 200 x 200 =====
+          # ===== BED SIZE: 200 x 200 x 100 =====
           sed -i 's/^[[:space:]]*#define X_BED_SIZE.*/#define X_BED_SIZE 200/' Configuration.h
           sed -i 's/^[[:space:]]*#define Y_BED_SIZE.*/#define Y_BED_SIZE 200/' Configuration.h
           sed -i 's/^[[:space:]]*#define Z_MAX_POS.*/#define Z_MAX_POS 100/' Configuration.h
@@ -64,22 +63,26 @@ jobs:
           # ===== EXTRUDER =====
           sed -i 's/^[[:space:]]*#define EXTRUDERS.*/#define EXTRUDERS 1/' Configuration.h
           
-          # ===== TEMPERATURE: DISABLED for bioprinter =====
-          # Use dummy thermistor 998 (always reads 25°C) to bypass thermal checks
+          # ===== TEMPERATURE: DUMMY for bioprinter =====
+          # Sensor 998 = dummy, always reads 25°C
           sed -i 's/^[[:space:]]*#define TEMP_SENSOR_0.*/#define TEMP_SENSOR_0 998/' Configuration.h
           sed -i 's/^[[:space:]]*#define TEMP_SENSOR_BED.*/#define TEMP_SENSOR_BED 0/' Configuration.h
           
-          # Disable thermal runaway protection (no heaters to protect)
+          # IMPORTANT: Keep MAXTEMP high enough for macros to compile (sensor 998 always reads 25°C anyway)
+          sed -i 's/^[[:space:]]*#define HEATER_0_MAXTEMP.*/#define HEATER_0_MAXTEMP 275/' Configuration.h
+          sed -i 's/^[[:space:]]*#define BED_MAXTEMP.*/#define BED_MAXTEMP 120/' Configuration.h
+          
+          # Disable PID (no real heater)
+          sed -i 's/^[[:space:]]*#define PIDTEMP.*/\/\/#define PIDTEMP/' Configuration.h
+          sed -i 's/^[[:space:]]*#define PIDTEMPBED.*/\/\/#define PIDTEMPBED/' Configuration.h
+          
+          # Disable thermal protection (no heaters to protect)
           sed -i 's/^[[:space:]]*#define THERMAL_PROTECTION_HOTENDS.*/\/\/#define THERMAL_PROTECTION_HOTENDS/' Configuration.h
           sed -i 's/^[[:space:]]*#define THERMAL_PROTECTION_BED.*/\/\/#define THERMAL_PROTECTION_BED/' Configuration.h
           
           # Allow cold extrusion (no temp checking)
           sed -i 's/^[[:space:]]*#define PREVENT_COLD_EXTRUSION.*/\/\/#define PREVENT_COLD_EXTRUSION/' Configuration.h
           sed -i 's/^[[:space:]]*#define EXTRUDE_MINTEMP.*/\/\/#define EXTRUDE_MINTEMP/' Configuration.h
-          
-          # ===== HEATER LIMITS (dummy values since no real heaters) =====
-          sed -i 's/^[[:space:]]*#define HEATER_0_MAXTEMP.*/#define HEATER_0_MAXTEMP 30/' Configuration.h
-          sed -i 's/^[[:space:]]*#define BED_MAXTEMP.*/#define BED_MAXTEMP 30/' Configuration.h
           
           # ===== STEPPER DRIVERS (TMC2209) =====
           sed -i 's/^[[:space:]]*\/\/#define X_DRIVER_TYPE.*/#define X_DRIVER_TYPE TMC2209/' Configuration.h
@@ -96,27 +99,24 @@ jobs:
           sed -i 's/^[[:space:]]*\/\/#define EEPROM_SETTINGS/#define EEPROM_SETTINGS/' Configuration.h
           sed -i 's/^[[:space:]]*\/\/#define SDSUPPORT/#define SDSUPPORT/' Configuration.h
           
-          # ===== LCD (MKS MINI12864 V3) - ENABLED for testing =====
+          # ===== LCD (MKS MINI12864 V3) =====
           sed -i 's/^[[:space:]]*\/\/#define MKS_MINI_12864_V3/#define MKS_MINI_12864_V3/' Configuration.h
           
-          # ===== BOOTSCREEN (HASSI custom logo) =====
-          # SHOW_BOOTSCREEN is usually enabled by default
+          # ===== CUSTOM BOOTSCREEN =====
+          sed -i 's/^[[:space:]]*\/\/#define SHOW_CUSTOM_BOOTSCREEN/#define SHOW_CUSTOM_BOOTSCREEN/' Configuration.h
           sed -i 's/^[[:space:]]*\/\/#define SHOW_BOOTSCREEN/#define SHOW_BOOTSCREEN/' Configuration.h
           
           echo ""
           echo "=== AFTER: Bioprinter settings ==="
-          grep -n "MOTHERBOARD\|TEMP_SENSOR\|X_BED_SIZE\|Y_BED_SIZE\|THERMAL_PROTECTION\|PREVENT_COLD_EXTRUSION" Configuration.h | head -15
+          grep -n "MOTHERBOARD\|TEMP_SENSOR\|X_BED_SIZE\|Y_BED_SIZE\|HEATER.*MAXTEMP\|THERMAL_PROTECTION\|PIDTEMP\|PREVENT_COLD" Configuration.h | head -20
 
       - name: Configure Advanced Settings
         run: |
           cd Marlin/Marlin
           
-          # ===== HOST SUPPORT (Pronterface/OctoPrint) =====
+          # ===== HOST SUPPORT (Pronterface) =====
           sed -i 's/^[[:space:]]*\/\/#define HOST_ACTION_COMMANDS/#define HOST_ACTION_COMMANDS/' Configuration_adv.h
           sed -i 's/^[[:space:]]*\/\/#define HOST_PROMPT_SUPPORT/#define HOST_PROMPT_SUPPORT/' Configuration_adv.h
-          
-          echo "=== Advanced config verified ==="
-          grep "HOST_ACTION_COMMANDS\|HOST_PROMPT_SUPPORT" Configuration_adv.h | grep -v "//" | head -5
 
       - name: Build Firmware
         run: |
