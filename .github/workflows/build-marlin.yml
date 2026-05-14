@@ -23,28 +23,28 @@ jobs:
           wget -q https://github.com/MarlinFirmware/Configurations/archive/refs/tags/2.1.2.5.zip -O configs.zip
           unzip -q configs.zip
           echo "✅ Configurations 2.1.2.5 downloaded"
-          echo "=== Searching for Monster8 configs ==="
-          find Configurations-2.1.2.5 -type d -name "*Monster*" 2>/dev/null || true
-          find Configurations-2.1.2.5 -path "*/Mks/*" -type d 2>/dev/null | head -20 || true
 
       - name: Copy Monster8 Configs
         run: |
-          # Find the correct path dynamically
-          CONFIG_BASE=$(find Configurations-2.1.2.5 -type d -name "Monster8" | head -1)
-          if [ -z "$CONFIG_BASE" ]; then
-            # Try alternate paths
-            CONFIG_BASE=$(find Configurations-2.1.2.5 -path "*/Mks/*/Monster8" -type d | head -1)
-          fi
-          if [ -z "$CONFIG_BASE" ]; then
-            echo "❌ Monster8 config directory not found!"
-            echo "Available MKS directories:"
-            find Configurations-2.1.2.5 -type d -iname "*mks*" | head -20
+          # The correct path based on your debug output
+          CONFIG_SRC="Configurations-2.1.2.5/config/examples/Mks"
+
+          echo "=== Searching for Monster8 in Mks directory ==="
+          find "$CONFIG_SRC" -type d -name "*Monster*" 2>/dev/null || true
+
+          # Try to find Monster8 configs
+          MONSTER_DIR=$(find "$CONFIG_SRC" -type d -name "*Monster*" | head -1)
+
+          if [ -z "$MONSTER_DIR" ]; then
+            echo "❌ Monster8 directory not found in Mks!"
+            echo "Available in Mks:"
+            ls -la "$CONFIG_SRC" || true
             exit 1
           fi
 
-          echo "✅ Found Monster8 configs at: $CONFIG_BASE"
-          cp "$CONFIG_BASE/Configuration.h" Marlin/Marlin/Configuration.h
-          cp "$CONFIG_BASE/Configuration_adv.h" Marlin/Marlin/Configuration_adv.h
+          echo "✅ Found Monster8 at: $MONSTER_DIR"
+          cp "$MONSTER_DIR/Configuration.h" Marlin/Marlin/Configuration.h
+          cp "$MONSTER_DIR/Configuration_adv.h" Marlin/Marlin/Configuration_adv.h
           echo "✅ Monster8 configs copied"
 
       - name: Apply Bioprinter Patches
@@ -138,7 +138,6 @@ jobs:
             0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0xF0, 0xFF, 0xFF, 0x7F, 0x1F, 0x01, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x07, 0x07, 0x0F, 0x1F, 0x3E, 0x7C, 0xF8, 0xF0, 0xE0,
             0x40, 0xC0, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
