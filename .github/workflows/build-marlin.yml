@@ -27,11 +27,20 @@ jobs:
 
       - name: Copy Custom Bootscreen
         run: |
-          # In modern Marlin, _Bootscreen.h goes in Marlin/src/lcd/dogm/
           mkdir -p Marlin/Marlin/src/lcd/dogm
           cp user-repo/_Bootscreen.h Marlin/Marlin/src/lcd/dogm/_Bootscreen.h
           echo "✅ Custom HASSI bootscreen copied"
-          ls -la Marlin/Marlin/src/lcd/dogm/_Bootscreen.h
+
+      - name: Fix USB CDC for Windows 10/11
+        run: |
+          # Patch USB descriptor to use Microsoft inbox driver (usbser.sys)
+          DESC_FILE="Marlin/Marlin/src/HAL/STM32/usb/usbd_desc.c"
+          if [ -f "$DESC_FILE" ]; then
+            sed -i 's/0x00,.*\/\* bDeviceClass \*\//0x02, \/* bDeviceClass *\/' "$DESC_FILE"
+            echo "✅ USB descriptor patched for Windows inbox driver"
+          else
+            echo "⚠️ usbd_desc.c not found, skipping USB patch"
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -47,9 +56,6 @@ jobs:
         run: |
           cd Marlin/Marlin
           
-          echo "=== BEFORE: Current settings ==="
-          grep -n "MOTHERBOARD\|TEMP_SENSOR\|X_BED_SIZE\|Y_BED_SIZE\|HEATER.*MAXTEMP" Configuration.h | head -15
-          
           # ===== BOARD & SERIAL =====
           sed -i 's/^[[:space:]]*#define MOTHERBOARD.*/#define MOTHERBOARD BOARD_MKS_MONSTER8_V2/' Configuration.h
           sed -i 's/^[[:space:]]*#define SERIAL_PORT.*/#define SERIAL_PORT -1/' Configuration.h
@@ -64,23 +70,20 @@ jobs:
           sed -i 's/^[[:space:]]*#define EXTRUDERS.*/#define EXTRUDERS 1/' Configuration.h
           
           # ===== TEMPERATURE: DUMMY for bioprinter =====
-          # Sensor 998 = dummy, always reads 25°C
           sed -i 's/^[[:space:]]*#define TEMP_SENSOR_0.*/#define TEMP_SENSOR_0 998/' Configuration.h
           sed -i 's/^[[:space:]]*#define TEMP_SENSOR_BED.*/#define TEMP_SENSOR_BED 0/' Configuration.h
-          
-          # IMPORTANT: Keep MAXTEMP high enough for macros to compile (sensor 998 always reads 25°C anyway)
           sed -i 's/^[[:space:]]*#define HEATER_0_MAXTEMP.*/#define HEATER_0_MAXTEMP 275/' Configuration.h
           sed -i 's/^[[:space:]]*#define BED_MAXTEMP.*/#define BED_MAXTEMP 120/' Configuration.h
           
-          # Disable PID (no real heater)
+          # Disable PID
           sed -i 's/^[[:space:]]*#define PIDTEMP.*/\/\/#define PIDTEMP/' Configuration.h
           sed -i 's/^[[:space:]]*#define PIDTEMPBED.*/\/\/#define PIDTEMPBED/' Configuration.h
           
-          # Disable thermal protection (no heaters to protect)
+          # Disable thermal protection
           sed -i 's/^[[:space:]]*#define THERMAL_PROTECTION_HOTENDS.*/\/\/#define THERMAL_PROTECTION_HOTENDS/' Configuration.h
           sed -i 's/^[[:space:]]*#define THERMAL_PROTECTION_BED.*/\/\/#define THERMAL_PROTECTION_BED/' Configuration.h
           
-          # Allow cold extrusion (no temp checking)
+          # Allow cold extrusion
           sed -i 's/^[[:space:]]*#define PREVENT_COLD_EXTRUSION.*/\/\/#define PREVENT_COLD_EXTRUSION/' Configuration.h
           sed -i 's/^[[:space:]]*#define EXTRUDE_MINTEMP.*/\/\/#define EXTRUDE_MINTEMP/' Configuration.h
           
@@ -105,16 +108,10 @@ jobs:
           # ===== CUSTOM BOOTSCREEN =====
           sed -i 's/^[[:space:]]*\/\/#define SHOW_CUSTOM_BOOTSCREEN/#define SHOW_CUSTOM_BOOTSCREEN/' Configuration.h
           sed -i 's/^[[:space:]]*\/\/#define SHOW_BOOTSCREEN/#define SHOW_BOOTSCREEN/' Configuration.h
-          
-          echo ""
-          echo "=== AFTER: Bioprinter settings ==="
-          grep -n "MOTHERBOARD\|TEMP_SENSOR\|X_BED_SIZE\|Y_BED_SIZE\|HEATER.*MAXTEMP\|THERMAL_PROTECTION\|PIDTEMP\|PREVENT_COLD" Configuration.h | head -20
 
       - name: Configure Advanced Settings
         run: |
           cd Marlin/Marlin
-          
-          # ===== HOST SUPPORT (Pronterface) =====
           sed -i 's/^[[:space:]]*\/\/#define HOST_ACTION_COMMANDS/#define HOST_ACTION_COMMANDS/' Configuration_adv.h
           sed -i 's/^[[:space:]]*\/\/#define HOST_PROMPT_SUPPORT/#define HOST_PROMPT_SUPPORT/' Configuration_adv.h
 
@@ -127,10 +124,7 @@ jobs:
         run: |
           echo "=== Output files ==="
           ls -lh Marlin/.pio/build/mks_monster8_usb_flash_drive/
-          
-          echo "=== Binary details ==="
           file Marlin/.pio/build/mks_monster8_usb_flash_drive/mks_monster8.bin || true
-          file Marlin/.pio/build/mks_monster8_usb_flash_drive/firmware.bin || true
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
