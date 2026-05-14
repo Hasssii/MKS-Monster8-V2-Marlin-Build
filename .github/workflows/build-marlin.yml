@@ -1,4 +1,4 @@
-name: Build HASSI Bioprinter from MKS Base
+name: Build HASSI Bioprinter MKS Monster8
 
 on:
   workflow_dispatch:
@@ -24,74 +24,86 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install PlatformIO
+      - name: Install PlatformIO (Pinned Working Version)
         run: |
-          pip install platformio
-          pio upgrade
+          pip install platformio==6.1.4
+          pio --version
 
       - name: Modify for Bioprinter (200x200, No Temp)
         run: |
-          cd "MKS-Monster8/marlin firmware for voron/MKS_MONSTER_Marlin-2.0.x/Marlin-2.0.x/Marlin"
-          
+          CONFIG_PATH="MKS-Monster8/marlin firmware for voron/MKS_MONSTER_Marlin-2.0.x/Marlin-2.0.x/Marlin"
+          cd "$CONFIG_PATH"
+
           echo "=== Original settings ==="
-          grep -n "X_BED_SIZE\|Y_BED_SIZE\|TEMP_SENSOR\|MOTHERBOARD" Configuration.h | head -10
-          
-          # ===== BOARD (keep MKS Monster8 V2) =====
-          # Already set in MKS config
-          
+          grep -n "X_BED_SIZE\|Y_BED_SIZE\|TEMP_SENSOR\|MOTHERBOARD\|PREVENT_COLD\|THERMAL_PROTECTION" Configuration.h | head -20
+
           # ===== BED SIZE: 200 x 200 =====
           sed -i 's/#define X_BED_SIZE.*/#define X_BED_SIZE 200/' Configuration.h
           sed -i 's/#define Y_BED_SIZE.*/#define Y_BED_SIZE 200/' Configuration.h
           sed -i 's/#define Z_MAX_POS.*/#define Z_MAX_POS 100/' Configuration.h
-          
+
           # ===== TEMPERATURE: DUMMY for bioprinter =====
           sed -i 's/#define TEMP_SENSOR_0.*/#define TEMP_SENSOR_0 998/' Configuration.h
           sed -i 's/#define TEMP_SENSOR_BED.*/#define TEMP_SENSOR_BED 0/' Configuration.h
-          
-          # Disable thermal protection
-          sed -i 's/#define THERMAL_PROTECTION_HOTENDS.*/\/\/#define THERMAL_PROTECTION_HOTENDS/' Configuration.h
-          sed -i 's/#define THERMAL_PROTECTION_BED.*/\/\/#define THERMAL_PROTECTION_BED/' Configuration.h
-          
-          # Allow cold extrusion
-          sed -i 's/#define PREVENT_COLD_EXTRUSION.*/\/\/#define PREVENT_COLD_EXTRUSION/' Configuration.h
-          
+
+          # Disable thermal protection (comment out)
+          sed -i 's/^#define THERMAL_PROTECTION_HOTENDS/\/#define THERMAL_PROTECTION_HOTENDS/' Configuration.h
+          sed -i 's/^#define THERMAL_PROTECTION_BED/\/#define THERMAL_PROTECTION_BED/' Configuration.h
+
+          # Allow cold extrusion (comment out)
+          sed -i 's/^#define PREVENT_COLD_EXTRUSION/\/#define PREVENT_COLD_EXTRUSION/' Configuration.h
+          sed -i 's/^#define PREVENT_LENGTHY_EXTRUDE/\/#define PREVENT_LENGTHY_EXTRUDE/' Configuration.h
+
           echo ""
           echo "=== Modified settings ==="
-          grep -n "X_BED_SIZE\|Y_BED_SIZE\|TEMP_SENSOR\|THERMAL_PROTECTION\|PREVENT_COLD" Configuration.h | head -15
+          grep -n "X_BED_SIZE\|Y_BED_SIZE\|TEMP_SENSOR\|THERMAL_PROTECTION\|PREVENT_COLD" Configuration.h | head -20
 
       - name: Build Firmware
         run: |
           cd "MKS-Monster8/marlin firmware for voron/MKS_MONSTER_Marlin-2.0.x/Marlin-2.0.x"
           pio run -e mks_monster8
 
-      - name: Verify Binary Size
+      - name: Verify Binary
         run: |
+          BIN_PATH="MKS-Monster8/marlin firmware for voron/MKS_MONSTER_Marlin-2.0.x/Marlin-2.0.x/.pio/build/mks_monster8"
           echo "=== Output files ==="
-          ls -lh "MKS-Monster8/marlin firmware for voron/MKS_MONSTER_Marlin-2.0.x/Marlin-2.0.x/.pio/build/mks_monster8/"
-          
-          SIZE=$(stat -c%s "MKS-Monster8/marlin firmware for voron/MKS_MONSTER_Marlin-2.0.x/Marlin-2.0.x/.pio/build/mks_monster8/mks_monster8.bin" 2>/dev/null || echo 0)
-          echo "Binary size: $SIZE bytes ($((SIZE/1024)) KB)"
-          
-          if [ "$SIZE" -lt 150000 ]; then
-            echo "⚠️ WARNING: Binary seems too small! Expected > 150KB"
+          ls -lh "$BIN_PATH/"
+
+          BIN_FILE=$(find "$BIN_PATH" -name "*.bin" | head -1)
+          if [ -z "$BIN_FILE" ]; then
+            echo "❌ No .bin file found!"
             exit 1
-          else
-            echo "✅ Binary size looks good!"
           fi
 
-      - name: Upload Artifacts
+          SIZE=$(stat -c%s "$BIN_FILE")
+          echo "Binary: $BIN_FILE"
+          echo "Size: $SIZE bytes ($((SIZE/1024)) KB)"
+
+          if [ "$SIZE" -lt 100000 ]; then
+            echo "⚠️ WARNING: Binary seems too small!"
+            exit 1
+          fi
+
+          echo "✅ Build successful!"
+
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: hassi-bioprinter-firmware
           path: |
-            MKS-Monster8/marlin firmware for voron/MKS_MONSTER_Marlin-2.0.x/Marlin-2.0.x/.pio/build/mks_monster8/mks_monster8.bin
+            MKS-Monster8/marlin firmware for voron/MKS_MONSTER_Marlin-2.0.x/Marlin-2.0.x/.pio/build/mks_monster8/*.bin
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: hassi-bio-${{ github.run_number }}
+          tag_name: hassi-bio-v${{ github.run_number }}
           name: HASSI Bioprinter Build ${{ github.run_number }}
+          body: |
+            Automated build for HASSI Bioprinter
+            - Board: MKS Monster8 V2
+            - Bed: 200x200x100
+            - Temperature: Disabled (dummy sensors)
           files: |
-            MKS-Monster8/marlin firmware for voron/MKS_MONSTER_Marlin-2.0.x/Marlin-2.0.x/.pio/build/mks_monster8/mks_monster8.bin
+            MKS-Monster8/marlin firmware for voron/MKS_MONSTER_Marlin-2.0.x/Marlin-2.0.x/.pio/build/mks_monster8/*.bin
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
