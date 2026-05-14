@@ -30,82 +30,95 @@ jobs:
           pip install platformio
           pio upgrade
 
-      - name: Configure for MKS Monster8 V2 (Full Setup)
+      - name: Configure for MKS Monster8 V2
         run: |
           cd Marlin/Marlin
           
-          # ===== BOARD & SERIAL =====
-          sed -i 's/#define MOTHERBOARD.*/#define MOTHERBOARD BOARD_MKS_MONSTER8_V2/' Configuration.h
-          sed -i 's/#define SERIAL_PORT.*/#define SERIAL_PORT -1/' Configuration.h
-          sed -i 's|//#define SERIAL_PORT_2|#define SERIAL_PORT_2 1|' Configuration.h
+          echo "=== BEFORE: Current MOTHERBOARD setting ==="
+          grep -n "MOTHERBOARD" Configuration.h | head -3
           
-          # ===== PRINTER TYPE (Cartesian default - change to COREXY for Voron) =====
-          sed -i 's|//#define COREXY|#define COREXY|' Configuration.h
+          # ===== 1. BOARD & SERIAL =====
+          sed -i 's/^[[:space:]]*#define MOTHERBOARD.*/#define MOTHERBOARD BOARD_MKS_MONSTER8_V2/' Configuration.h
+          sed -i 's/^[[:space:]]*#define SERIAL_PORT.*/#define SERIAL_PORT -1/' Configuration.h
           
-          # ===== EXTRUDER =====
-          sed -i 's/#define EXTRUDERS.*/#define EXTRUDERS 1/' Configuration.h
-          sed -i 's|//#define SINGLENOZZLE|#define SINGLENOZZLE|' Configuration.h
+          # Enable second serial port for UART communication
+          sed -i 's/^[[:space:]]*\/\/#define SERIAL_PORT_2.*/#define SERIAL_PORT_2 1/' Configuration.h
           
-          # ===== BED SIZE (Voron 2.4 350mm example - adjust for your printer) =====
-          sed -i 's/#define X_BED_SIZE.*/#define X_BED_SIZE 350/' Configuration.h
-          sed -i 's/#define Y_BED_SIZE.*/#define Y_BED_SIZE 350/' Configuration.h
-          sed -i 's/#define Z_MAX_POS.*/#define Z_MAX_POS 350/' Configuration.h
+          echo "=== AFTER: MOTHERBOARD setting ==="
+          grep -n "MOTHERBOARD" Configuration.h | head -1
           
-          # ===== TEMPERATURE SENSORS =====
-          sed -i 's/#define TEMP_SENSOR_0.*/#define TEMP_SENSOR_0 1/' Configuration.h
-          sed -i 's/#define TEMP_SENSOR_BED.*/#define TEMP_SENSOR_BED 1/' Configuration.h
+          # ===== 2. PRINTER TYPE =====
+          # Uncomment COREXY for Voron printers (comment out for Cartesian)
+          sed -i 's/^[[:space:]]*\/\/#define COREXY/#define COREXY/' Configuration.h
           
-          # ===== HEATER LIMITS =====
-          sed -i 's/#define HEATER_0_MAXTEMP.*/#define HEATER_0_MAXTEMP 300/' Configuration.h
-          sed -i 's/#define BED_MAXTEMP.*/#define BED_MAXTEMP 120/' Configuration.h
+          # ===== 3. EXTRUDER (keep at 1, NO SINGLENOZZLE) =====
+          sed -i 's/^[[:space:]]*#define EXTRUDERS.*/#define EXTRUDERS 1/' Configuration.h
           
-          # ===== STEPPER DRIVERS (TMC2209 UART mode) =====
-          sed -i 's|//#define X_DRIVER_TYPE|#define X_DRIVER_TYPE|' Configuration.h
-          sed -i 's|//#define Y_DRIVER_TYPE|#define Y_DRIVER_TYPE|' Configuration.h
-          sed -i 's|//#define Z_DRIVER_TYPE|#define Z_DRIVER_TYPE|' Configuration.h
-          sed -i 's|//#define E0_DRIVER_TYPE|#define E0_DRIVER_TYPE|' Configuration.h
-          sed -i 's/#define X_DRIVER_TYPE.*/#define X_DRIVER_TYPE TMC2209/' Configuration.h
-          sed -i 's/#define Y_DRIVER_TYPE.*/#define Y_DRIVER_TYPE TMC2209/' Configuration.h
-          sed -i 's/#define Z_DRIVER_TYPE.*/#define Z_DRIVER_TYPE TMC2209/' Configuration.h
-          sed -i 's/#define E0_DRIVER_TYPE.*/#define E0_DRIVER_TYPE TMC2209/' Configuration.h
+          # ===== 4. BED SIZE (adjust for your printer) =====
+          sed -i 's/^[[:space:]]*#define X_BED_SIZE.*/#define X_BED_SIZE 350/' Configuration.h
+          sed -i 's/^[[:space:]]*#define Y_BED_SIZE.*/#define Y_BED_SIZE 350/' Configuration.h
+          sed -i 's/^[[:space:]]*#define Z_MAX_POS.*/#define Z_MAX_POS 350/' Configuration.h
           
-          # ===== ENDSTOPS =====
-          sed -i 's|//#define USE_XMIN_PLUG|#define USE_XMIN_PLUG|' Configuration.h
-          sed -i 's|//#define USE_YMIN_PLUG|#define USE_YMIN_PLUG|' Configuration.h
-          sed -i 's|//#define USE_ZMIN_PLUG|#define USE_ZMIN_PLUG|' Configuration.h
+          # ===== 5. TEMPERATURE SENSORS =====
+          sed -i 's/^[[:space:]]*#define TEMP_SENSOR_0.*/#define TEMP_SENSOR_0 1/' Configuration.h
+          sed -i 's/^[[:space:]]*#define TEMP_SENSOR_BED.*/#define TEMP_SENSOR_BED 1/' Configuration.h
           
-          # ===== EEPROM & SD CARD =====
-          sed -i 's|//#define EEPROM_SETTINGS|#define EEPROM_SETTINGS|' Configuration.h
-          sed -i 's|//#define SDSUPPORT|#define SDSUPPORT|' Configuration.h
+          # ===== 6. HEATER LIMITS =====
+          sed -i 's/^[[:space:]]*#define HEATER_0_MAXTEMP.*/#define HEATER_0_MAXTEMP 300/' Configuration.h
+          sed -i 's/^[[:space:]]*#define BED_MAXTEMP.*/#define BED_MAXTEMP 120/' Configuration.h
           
-          # ===== LCD (MKS MINI12864 V3) =====
-          sed -i 's|//#define MKS_MINI_12864_V3|#define MKS_MINI_12864_V3|' Configuration.h
+          # ===== 7. STEPPER DRIVERS (TMC2209 UART) =====
+          sed -i 's/^[[:space:]]*\/\/#define X_DRIVER_TYPE.*/#define X_DRIVER_TYPE TMC2209/' Configuration.h
+          sed -i 's/^[[:space:]]*\/\/#define Y_DRIVER_TYPE.*/#define Y_DRIVER_TYPE TMC2209/' Configuration.h
+          sed -i 's/^[[:space:]]*\/\/#define Z_DRIVER_TYPE.*/#define Z_DRIVER_TYPE TMC2209/' Configuration.h
+          sed -i 's/^[[:space:]]*\/\/#define E0_DRIVER_TYPE.*/#define E0_DRIVER_TYPE TMC2209/' Configuration.h
+          
+          # ===== 8. ENDSTOPS =====
+          sed -i 's/^[[:space:]]*\/\/#define USE_XMIN_PLUG/#define USE_XMIN_PLUG/' Configuration.h
+          sed -i 's/^[[:space:]]*\/\/#define USE_YMIN_PLUG/#define USE_YMIN_PLUG/' Configuration.h
+          sed -i 's/^[[:space:]]*\/\/#define USE_ZMIN_PLUG/#define USE_ZMIN_PLUG/' Configuration.h
+          
+          # ===== 9. EEPROM & SD CARD =====
+          sed -i 's/^[[:space:]]*\/\/#define EEPROM_SETTINGS/#define EEPROM_SETTINGS/' Configuration.h
+          sed -i 's/^[[:space:]]*\/\/#define SDSUPPORT/#define SDSUPPORT/' Configuration.h
+          
+          # ===== 10. LCD (MKS MINI12864 V3) - comment out if you don't have this display =====
+          sed -i 's/^[[:space:]]*\/\/#define MKS_MINI_12864_V3/#define MKS_MINI_12864_V3/' Configuration.h
+          
+          echo "=== Configuration.h verification ==="
+          grep "MOTHERBOARD\|COREXY\|EXTRUDERS\|X_BED_SIZE\|DRIVER_TYPE\|EEPROM_SETTINGS\|SDSUPPORT" Configuration.h | grep -v "//" | head -20
+
+      - name: Configure Advanced Settings
+        run: |
+          cd Marlin/Marlin
           
           # ===== HOST SUPPORT (OctoPrint/Klipper) =====
-          sed -i 's|//#define HOST_ACTION_COMMANDS|#define HOST_ACTION_COMMANDS|' Configuration_adv.h
-          sed -i 's|//#define HOST_PROMPT_SUPPORT|#define HOST_PROMPT_SUPPORT|' Configuration_adv.h
+          sed -i 's/^[[:space:]]*\/\/#define HOST_ACTION_COMMANDS/#define HOST_ACTION_COMMANDS/' Configuration_adv.h
+          sed -i 's/^[[:space:]]*\/\/#define HOST_PROMPT_SUPPORT/#define HOST_PROMPT_SUPPORT/' Configuration_adv.h
           
-          # ===== TMC UART MODE (Monster8 specific) =====
-          sed -i 's|//#define TMC_USE_SW_SPI|#define TMC_USE_SW_SPI|' Configuration_adv.h
-          
-          echo "=== Configuration complete ==="
-          grep "MOTHERBOARD" Configuration.h | head -1
-          grep "COREXY" Configuration.h | head -1
-          grep "EXTRUDERS" Configuration.h | head -1
+          echo "=== Configuration_adv.h verification ==="
+          grep "HOST_ACTION_COMMANDS\|HOST_PROMPT_SUPPORT" Configuration_adv.h | grep -v "//" | head -5
 
-      - name: Build Firmware (Full Version)
+      - name: Build Firmware
         run: |
           cd Marlin
-          # Use the FULL environment, not the minimal one
           pio run -e mks_monster8_usb_flash_drive
 
       - name: Verify Binary Size
         run: |
           echo "=== Output files ==="
           ls -lh Marlin/.pio/build/mks_monster8_usb_flash_drive/
-          echo "=== File info ==="
+          
+          echo "=== Binary details ==="
           file Marlin/.pio/build/mks_monster8_usb_flash_drive/mks_monster8.bin || true
           file Marlin/.pio/build/mks_monster8_usb_flash_drive/firmware.bin || true
+          
+          # Check size is reasonable (should be > 100KB)
+          SIZE=$(stat -c%s Marlin/.pio/build/mks_monster8_usb_flash_drive/mks_monster8.bin 2>/dev/null || echo 0)
+          echo "Binary size: $SIZE bytes"
+          if [ "$SIZE" -lt 100000 ]; then
+            echo "WARNING: Binary seems too small! Expected > 100KB"
+          fi
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
