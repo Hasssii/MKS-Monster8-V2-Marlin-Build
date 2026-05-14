@@ -30,47 +30,98 @@ jobs:
           pip install platformio
           pio upgrade
 
-      - name: Configure for MKS Monster8 V2
+      - name: Configure for MKS Monster8 V2 (Full Setup)
         run: |
           cd Marlin/Marlin
           
-          # Set the motherboard to MKS Monster8 V2
+          # ===== BOARD & SERIAL =====
           sed -i 's/#define MOTHERBOARD.*/#define MOTHERBOARD BOARD_MKS_MONSTER8_V2/' Configuration.h
-          
-          # Set serial port for USB
           sed -i 's/#define SERIAL_PORT.*/#define SERIAL_PORT -1/' Configuration.h
+          sed -i 's|//#define SERIAL_PORT_2|#define SERIAL_PORT_2 1|' Configuration.h
           
-          # Enable EEPROM
+          # ===== PRINTER TYPE (Cartesian default - change to COREXY for Voron) =====
+          sed -i 's|//#define COREXY|#define COREXY|' Configuration.h
+          
+          # ===== EXTRUDER =====
+          sed -i 's/#define EXTRUDERS.*/#define EXTRUDERS 1/' Configuration.h
+          sed -i 's|//#define SINGLENOZZLE|#define SINGLENOZZLE|' Configuration.h
+          
+          # ===== BED SIZE (Voron 2.4 350mm example - adjust for your printer) =====
+          sed -i 's/#define X_BED_SIZE.*/#define X_BED_SIZE 350/' Configuration.h
+          sed -i 's/#define Y_BED_SIZE.*/#define Y_BED_SIZE 350/' Configuration.h
+          sed -i 's/#define Z_MAX_POS.*/#define Z_MAX_POS 350/' Configuration.h
+          
+          # ===== TEMPERATURE SENSORS =====
+          sed -i 's/#define TEMP_SENSOR_0.*/#define TEMP_SENSOR_0 1/' Configuration.h
+          sed -i 's/#define TEMP_SENSOR_BED.*/#define TEMP_SENSOR_BED 1/' Configuration.h
+          
+          # ===== HEATER LIMITS =====
+          sed -i 's/#define HEATER_0_MAXTEMP.*/#define HEATER_0_MAXTEMP 300/' Configuration.h
+          sed -i 's/#define BED_MAXTEMP.*/#define BED_MAXTEMP 120/' Configuration.h
+          
+          # ===== STEPPER DRIVERS (TMC2209 UART mode) =====
+          sed -i 's|//#define X_DRIVER_TYPE|#define X_DRIVER_TYPE|' Configuration.h
+          sed -i 's|//#define Y_DRIVER_TYPE|#define Y_DRIVER_TYPE|' Configuration.h
+          sed -i 's|//#define Z_DRIVER_TYPE|#define Z_DRIVER_TYPE|' Configuration.h
+          sed -i 's|//#define E0_DRIVER_TYPE|#define E0_DRIVER_TYPE|' Configuration.h
+          sed -i 's/#define X_DRIVER_TYPE.*/#define X_DRIVER_TYPE TMC2209/' Configuration.h
+          sed -i 's/#define Y_DRIVER_TYPE.*/#define Y_DRIVER_TYPE TMC2209/' Configuration.h
+          sed -i 's/#define Z_DRIVER_TYPE.*/#define Z_DRIVER_TYPE TMC2209/' Configuration.h
+          sed -i 's/#define E0_DRIVER_TYPE.*/#define E0_DRIVER_TYPE TMC2209/' Configuration.h
+          
+          # ===== ENDSTOPS =====
+          sed -i 's|//#define USE_XMIN_PLUG|#define USE_XMIN_PLUG|' Configuration.h
+          sed -i 's|//#define USE_YMIN_PLUG|#define USE_YMIN_PLUG|' Configuration.h
+          sed -i 's|//#define USE_ZMIN_PLUG|#define USE_ZMIN_PLUG|' Configuration.h
+          
+          # ===== EEPROM & SD CARD =====
           sed -i 's|//#define EEPROM_SETTINGS|#define EEPROM_SETTINGS|' Configuration.h
-          
-          # Enable SD card support
           sed -i 's|//#define SDSUPPORT|#define SDSUPPORT|' Configuration.h
           
-          # Verify changes
+          # ===== LCD (MKS MINI12864 V3) =====
+          sed -i 's|//#define MKS_MINI_12864_V3|#define MKS_MINI_12864_V3|' Configuration.h
+          
+          # ===== HOST SUPPORT (OctoPrint/Klipper) =====
+          sed -i 's|//#define HOST_ACTION_COMMANDS|#define HOST_ACTION_COMMANDS|' Configuration_adv.h
+          sed -i 's|//#define HOST_PROMPT_SUPPORT|#define HOST_PROMPT_SUPPORT|' Configuration_adv.h
+          
+          # ===== TMC UART MODE (Monster8 specific) =====
+          sed -i 's|//#define TMC_USE_SW_SPI|#define TMC_USE_SW_SPI|' Configuration_adv.h
+          
+          echo "=== Configuration complete ==="
           grep "MOTHERBOARD" Configuration.h | head -1
-          grep "SERIAL_PORT" Configuration.h | head -1
+          grep "COREXY" Configuration.h | head -1
+          grep "EXTRUDERS" Configuration.h | head -1
 
-      - name: Build Firmware
+      - name: Build Firmware (Full Version)
         run: |
           cd Marlin
-          pio run -e mks_monster8
+          # Use the FULL environment, not the minimal one
+          pio run -e mks_monster8_usb_flash_drive
 
       - name: Verify Binary Size
         run: |
-          ls -lh Marlin/.pio/build/mks_monster8/
-          file Marlin/.pio/build/mks_monster8/mks_monster8.bin
+          echo "=== Output files ==="
+          ls -lh Marlin/.pio/build/mks_monster8_usb_flash_drive/
+          echo "=== File info ==="
+          file Marlin/.pio/build/mks_monster8_usb_flash_drive/mks_monster8.bin || true
+          file Marlin/.pio/build/mks_monster8_usb_flash_drive/firmware.bin || true
 
-      - name: Upload Artifact
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: mks-monster8-v2-firmware
-          path: Marlin/.pio/build/mks_monster8/mks_monster8.bin
+          path: |
+            Marlin/.pio/build/mks_monster8_usb_flash_drive/mks_monster8.bin
+            Marlin/.pio/build/mks_monster8_usb_flash_drive/firmware.bin
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: build-${{ github.run_number }}
           name: MKS Monster8 V2 Build ${{ github.run_number }}
-          files: Marlin/.pio/build/mks_monster8/mks_monster8.bin
+          files: |
+            Marlin/.pio/build/mks_monster8_usb_flash_drive/mks_monster8.bin
+            Marlin/.pio/build/mks_monster8_usb_flash_drive/firmware.bin
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
