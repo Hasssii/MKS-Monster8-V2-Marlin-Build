@@ -1,0 +1,67 @@
+name: Build Marlin for MKS Monster8 V2
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 0'
+permissions:
+  contents: write
+  actions: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Latest Marlin
+        uses: actions/checkout@v4
+        with:
+          repository: MarlinFirmware/Marlin
+          ref: bugfix-2.1.x
+          path: Marlin
+
+      - name: Checkout Latest Configurations
+        uses: actions/checkout@v4
+        with:
+          repository: MarlinFirmware/Configurations
+          ref: bugfix-2.1.x
+          path: Configurations
+
+      - name: Copy MKS Monster8 Config
+        run: |
+          ls Configurations/config/examples/MKS/
+          cp Configurations/config/examples/MKS/Monster8/Configuration.h Marlin/Marlin/
+          cp Configurations/config/examples/MKS/Monster8/Configuration_adv.h Marlin/Marlin/
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PlatformIO
+        run: |
+          pip install platformio
+          pio upgrade
+
+      - name: Build Firmware
+        run: |
+          cd Marlin
+          pio run -e mks_monster8
+
+      - name: Verify Binary Size
+        run: |
+          ls -lh Marlin/.pio/build/mks_monster8/
+          file Marlin/.pio/build/mks_monster8/mks_monster8.bin
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mks-monster8-v2-firmware
+          path: Marlin/.pio/build/mks_monster8/mks_monster8.bin
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: MKS Monster8 V2 Build ${{ github.run_number }}
+          files: Marlin/.pio/build/mks_monster8/mks_monster8.bin
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
