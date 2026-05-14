@@ -1,4 +1,4 @@
-name: Build HASSI Bioprinter Firmware (MKS Monster8 V2)
+name: Build HASSI Bioprinter from MKS Base
 
 on:
   workflow_dispatch:
@@ -13,135 +13,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Your Repo (for _Bootscreen.h)
+      - name: Checkout Your MKS-Monster8 Repo
         uses: actions/checkout@v4
         with:
-          path: user-repo
-
-      - name: Checkout Latest Marlin
-        uses: actions/checkout@v4
-        with:
-          repository: MarlinFirmware/Marlin
-          ref: bugfix-2.1.x
-          path: Marlin
-
-      - name: Copy Custom Bootscreen
-        run: |
-          mkdir -p Marlin/Marlin/src/lcd/dogm
-          cp user-repo/_Bootscreen.h Marlin/Marlin/src/lcd/dogm/_Bootscreen.h
-          echo "✅ Custom HASSI bootscreen copied"
-
-      - name: Configure for HASSI Bioprinter (FULL FEATURES)
-        run: |
-          cd Marlin/Marlin
-          
-          echo "=== ENABLING ALL CORE FEATURES ==="
-          
-          # ===== BOARD & SERIAL =====
-          sed -i 's/^[[:space:]]*#define MOTHERBOARD.*/#define MOTHERBOARD BOARD_MKS_MONSTER8_V2/' Configuration.h
-          sed -i 's/^[[:space:]]*#define SERIAL_PORT.*/#define SERIAL_PORT -1/' Configuration.h
-          sed -i 's/^[[:space:]]*\/\/#define SERIAL_PORT_2.*/#define SERIAL_PORT_2 1/' Configuration.h
-          sed -i 's/^[[:space:]]*#define BAUDRATE.*/#define BAUDRATE 250000/' Configuration.h
-          
-          # ===== MACHINE NAME =====
-          sed -i 's/^[[:space:]]*\/\/#define CUSTOM_MACHINE_NAME.*/#define CUSTOM_MACHINE_NAME "HASSI Bioprinter"/' Configuration.h
-          
-          # ===== BED SIZE: 200 x 200 x 100 =====
-          sed -i 's/^[[:space:]]*#define X_BED_SIZE.*/#define X_BED_SIZE 200/' Configuration.h
-          sed -i 's/^[[:space:]]*#define Y_BED_SIZE.*/#define Y_BED_SIZE 200/' Configuration.h
-          sed -i 's/^[[:space:]]*#define Z_MAX_POS.*/#define Z_MAX_POS 100/' Configuration.h
-          
-          # ===== EXTRUDER =====
-          sed -i 's/^[[:space:]]*#define EXTRUDERS.*/#define EXTRUDERS 1/' Configuration.h
-          
-          # ===== TEMPERATURE: DUMMY for bioprinter =====
-          sed -i 's/^[[:space:]]*#define TEMP_SENSOR_0.*/#define TEMP_SENSOR_0 998/' Configuration.h
-          sed -i 's/^[[:space:]]*#define TEMP_SENSOR_BED.*/#define TEMP_SENSOR_BED 0/' Configuration.h
-          sed -i 's/^[[:space:]]*#define HEATER_0_MAXTEMP.*/#define HEATER_0_MAXTEMP 275/' Configuration.h
-          sed -i 's/^[[:space:]]*#define BED_MAXTEMP.*/#define BED_MAXTEMP 120/' Configuration.h
-          
-          # Disable PID (no real heater)
-          sed -i 's/^[[:space:]]*#define PIDTEMP$/#define PIDTEMP/' Configuration.h || true
-          sed -i 's/^[[:space:]]*#define PIDTEMPBED$/#define PIDTEMPBED/' Configuration.h || true
-          
-          # Disable thermal protection
-          sed -i 's/^[[:space:]]*#define THERMAL_PROTECTION_HOTENDS.*/\/\/#define THERMAL_PROTECTION_HOTENDS/' Configuration.h
-          sed -i 's/^[[:space:]]*#define THERMAL_PROTECTION_BED.*/\/\/#define THERMAL_PROTECTION_BED/' Configuration.h
-          
-          # Allow cold extrusion
-          sed -i 's/^[[:space:]]*#define PREVENT_COLD_EXTRUSION.*/\/\/#define PREVENT_COLD_EXTRUSION/' Configuration.h
-          sed -i 's/^[[:space:]]*#define EXTRUDE_MINTEMP.*/\/\/#define EXTRUDE_MINTEMP/' Configuration.h
-          
-          # ===== STEPPER DRIVERS (TMC2209 UART) =====
-          sed -i 's/^[[:space:]]*\/\/#define X_DRIVER_TYPE.*/#define X_DRIVER_TYPE TMC2209/' Configuration.h
-          sed -i 's/^[[:space:]]*\/\/#define Y_DRIVER_TYPE.*/#define Y_DRIVER_TYPE TMC2209/' Configuration.h
-          sed -i 's/^[[:space:]]*\/\/#define Z_DRIVER_TYPE.*/#define Z_DRIVER_TYPE TMC2209/' Configuration.h
-          sed -i 's/^[[:space:]]*\/\/#define E0_DRIVER_TYPE.*/#define E0_DRIVER_TYPE TMC2209/' Configuration.h
-          
-          # ===== ENDSTOPS =====
-          sed -i 's/^[[:space:]]*\/\/#define USE_XMIN_PLUG/#define USE_XMIN_PLUG/' Configuration.h
-          sed -i 's/^[[:space:]]*\/\/#define USE_YMIN_PLUG/#define USE_YMIN_PLUG/' Configuration.h
-          sed -i 's/^[[:space:]]*\/\/#define USE_ZMIN_PLUG/#define USE_ZMIN_PLUG/' Configuration.h
-          
-          # ===== MOVEMENT SETTINGS (CRITICAL!) =====
-          # Default steps per unit - REQUIRED for motors to move
-          sed -i 's/^[[:space:]]*#define DEFAULT_AXIS_STEPS_PER_UNIT.*/#define DEFAULT_AXIS_STEPS_PER_UNIT { 80, 80, 400, 95 }/' Configuration.h
-          
-          # Default max feedrate
-          sed -i 's/^[[:space:]]*#define DEFAULT_MAX_FEEDRATE.*/#define DEFAULT_MAX_FEEDRATE { 300, 300, 5, 25 }/' Configuration.h
-          
-          # Default max acceleration
-          sed -i 's/^[[:space:]]*#define DEFAULT_MAX_ACCELERATION.*/#define DEFAULT_MAX_ACCELERATION { 3000, 3000, 100, 10000 }/' Configuration.h
-          
-          # Default acceleration
-          sed -i 's/^[[:space:]]*#define DEFAULT_ACCELERATION.*/#define DEFAULT_ACCELERATION 3000/' Configuration.h
-          
-          # Jerk settings
-          sed -i 's/^[[:space:]]*\/\/#define CLASSIC_JERK/#define CLASSIC_JERK/' Configuration.h
-          sed -i 's/^[[:space:]]*#define DEFAULT_XJERK.*/#define DEFAULT_XJERK 10.0/' Configuration.h
-          sed -i 's/^[[:space:]]*#define DEFAULT_YJERK.*/#define DEFAULT_YJERK 10.0/' Configuration.h
-          sed -i 's/^[[:space:]]*#define DEFAULT_ZJERK.*/#define DEFAULT_ZJERK 0.3/' Configuration.h
-          sed -i 's/^[[:space:]]*#define DEFAULT_EJERK.*/#define DEFAULT_EJERK 5.0/' Configuration.h
-          
-          # ===== EEPROM & SD CARD =====
-          sed -i 's/^[[:space:]]*\/\/#define EEPROM_SETTINGS/#define EEPROM_SETTINGS/' Configuration.h
-          sed -i 's/^[[:space:]]*\/\/#define SDSUPPORT/#define SDSUPPORT/' Configuration.h
-          
-          # ===== LCD (MKS MINI12864 V3) =====
-          sed -i 's/^[[:space:]]*\/\/#define MKS_MINI_12864_V3/#define MKS_MINI_12864_V3/' Configuration.h
-          
-          # ===== CUSTOM BOOTSCREEN =====
-          sed -i 's/^[[:space:]]*\/\/#define SHOW_CUSTOM_BOOTSCREEN/#define SHOW_CUSTOM_BOOTSCREEN/' Configuration.h
-          sed -i 's/^[[:space:]]*\/\/#define SHOW_BOOTSCREEN/#define SHOW_BOOTSCREEN/' Configuration.h
-          
-          # ===== HOMING =====
-          sed -i 's/^[[:space:]]*#define X_HOME_DIR.*/#define X_HOME_DIR -1/' Configuration.h
-          sed -i 's/^[[:space:]]*#define Y_HOME_DIR.*/#define Y_HOME_DIR -1/' Configuration.h
-          sed -i 's/^[[:space:]]*#define Z_HOME_DIR.*/#define Z_HOME_DIR -1/' Configuration.h
-          
-          # ===== SOFTWARE ENDSTOPS =====
-          sed -i 's/^[[:space:]]*\/\/#define MIN_SOFTWARE_ENDSTOPS/#define MIN_SOFTWARE_ENDSTOPS/' Configuration.h
-          sed -i 's/^[[:space:]]*\/\/#define MAX_SOFTWARE_ENDSTOPS/#define MAX_SOFTWARE_ENDSTOPS/' Configuration.h
-          
-          # ===== FAN (at least one for cooling) =====
-          sed -i 's/^[[:space:]]*#define FAN_PIN.*/#define FAN_PIN FAN1_PIN/' Configuration.h || true
-
-      - name: Configure Advanced Settings
-        run: |
-          cd Marlin/Marlin
-          
-          # ===== HOST SUPPORT (Pronterface) =====
-          sed -i 's/^[[:space:]]*\/\/#define HOST_ACTION_COMMANDS/#define HOST_ACTION_COMMANDS/' Configuration_adv.h
-          sed -i 's/^[[:space:]]*\/\/#define HOST_PROMPT_SUPPORT/#define HOST_PROMPT_SUPPORT/' Configuration_adv.h
-          
-          # ===== TMC UART SETTINGS =====
-          sed -i 's/^[[:space:]]*#define X_CURRENT.*/#define X_CURRENT 800/' Configuration_adv.h
-          sed -i 's/^[[:space:]]*#define Y_CURRENT.*/#define Y_CURRENT 800/' Configuration_adv.h
-          sed -i 's/^[[:space:]]*#define Z_CURRENT.*/#define Z_CURRENT 800/' Configuration_adv.h
-          sed -i 's/^[[:space:]]*#define E0_CURRENT.*/#define E0_CURRENT 800/' Configuration_adv.h
-          
-          # ===== POWER LOSS RECOVERY =====
-          sed -i 's/^[[:space:]]*\/\/#define POWER_LOSS_RECOVERY/#define POWER_LOSS_RECOVERY/' Configuration_adv.h
+          repository: Hassii/MKS-Monster8
+          path: MKS-Monster8
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -153,21 +29,52 @@ jobs:
           pip install platformio
           pio upgrade
 
+      - name: Modify for Bioprinter (200x200, No Temp)
+        run: |
+          cd "MKS-Monster8/marlin firmware for voron/MKS_MONSTER_Marlin-2.0.x/Marlin-2.0.x/Marlin"
+          
+          echo "=== Original settings ==="
+          grep -n "X_BED_SIZE\|Y_BED_SIZE\|TEMP_SENSOR\|MOTHERBOARD" Configuration.h | head -10
+          
+          # ===== BOARD (keep MKS Monster8 V2) =====
+          # Already set in MKS config
+          
+          # ===== BED SIZE: 200 x 200 =====
+          sed -i 's/#define X_BED_SIZE.*/#define X_BED_SIZE 200/' Configuration.h
+          sed -i 's/#define Y_BED_SIZE.*/#define Y_BED_SIZE 200/' Configuration.h
+          sed -i 's/#define Z_MAX_POS.*/#define Z_MAX_POS 100/' Configuration.h
+          
+          # ===== TEMPERATURE: DUMMY for bioprinter =====
+          sed -i 's/#define TEMP_SENSOR_0.*/#define TEMP_SENSOR_0 998/' Configuration.h
+          sed -i 's/#define TEMP_SENSOR_BED.*/#define TEMP_SENSOR_BED 0/' Configuration.h
+          
+          # Disable thermal protection
+          sed -i 's/#define THERMAL_PROTECTION_HOTENDS.*/\/\/#define THERMAL_PROTECTION_HOTENDS/' Configuration.h
+          sed -i 's/#define THERMAL_PROTECTION_BED.*/\/\/#define THERMAL_PROTECTION_BED/' Configuration.h
+          
+          # Allow cold extrusion
+          sed -i 's/#define PREVENT_COLD_EXTRUSION.*/\/\/#define PREVENT_COLD_EXTRUSION/' Configuration.h
+          
+          echo ""
+          echo "=== Modified settings ==="
+          grep -n "X_BED_SIZE\|Y_BED_SIZE\|TEMP_SENSOR\|THERMAL_PROTECTION\|PREVENT_COLD" Configuration.h | head -15
+
       - name: Build Firmware
         run: |
-          cd Marlin
-          pio run -e mks_monster8_usb_flash_drive
+          cd "MKS-Monster8/marlin firmware for voron/MKS_MONSTER_Marlin-2.0.x/Marlin-2.0.x"
+          pio run -e mks_monster8
 
       - name: Verify Binary Size
         run: |
           echo "=== Output files ==="
-          ls -lh Marlin/.pio/build/mks_monster8_usb_flash_drive/
+          ls -lh "MKS-Monster8/marlin firmware for voron/MKS_MONSTER_Marlin-2.0.x/Marlin-2.0.x/.pio/build/mks_monster8/"
           
-          SIZE=$(stat -c%s Marlin/.pio/build/mks_monster8_usb_flash_drive/mks_monster8.bin 2>/dev/null || echo 0)
+          SIZE=$(stat -c%s "MKS-Monster8/marlin firmware for voron/MKS_MONSTER_Marlin-2.0.x/Marlin-2.0.x/.pio/build/mks_monster8/mks_monster8.bin" 2>/dev/null || echo 0)
           echo "Binary size: $SIZE bytes ($((SIZE/1024)) KB)"
           
-          if [ "$SIZE" -lt 200000 ]; then
-            echo "⚠️ WARNING: Binary seems too small! Expected > 200KB for full firmware"
+          if [ "$SIZE" -lt 150000 ]; then
+            echo "⚠️ WARNING: Binary seems too small! Expected > 150KB"
+            exit 1
           else
             echo "✅ Binary size looks good!"
           fi
@@ -177,8 +84,7 @@ jobs:
         with:
           name: hassi-bioprinter-firmware
           path: |
-            Marlin/.pio/build/mks_monster8_usb_flash_drive/mks_monster8.bin
-            Marlin/.pio/build/mks_monster8_usb_flash_drive/firmware.bin
+            MKS-Monster8/marlin firmware for voron/MKS_MONSTER_Marlin-2.0.x/Marlin-2.0.x/.pio/build/mks_monster8/mks_monster8.bin
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
@@ -186,7 +92,6 @@ jobs:
           tag_name: hassi-bio-${{ github.run_number }}
           name: HASSI Bioprinter Build ${{ github.run_number }}
           files: |
-            Marlin/.pio/build/mks_monster8_usb_flash_drive/mks_monster8.bin
-            Marlin/.pio/build/mks_monster8_usb_flash_drive/firmware.bin
+            MKS-Monster8/marlin firmware for voron/MKS_MONSTER_Marlin-2.0.x/Marlin-2.0.x/.pio/build/mks_monster8/mks_monster8.bin
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
