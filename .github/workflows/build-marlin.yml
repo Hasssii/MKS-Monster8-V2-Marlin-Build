@@ -18,92 +18,6 @@ jobs:
           mv Marlin-2.1.2.5 Marlin
           echo "✅ Marlin 2.1.2.5 downloaded"
 
-      - name: Download MKS Monster8 Example Configs
-        run: |
-          wget -q https://github.com/MarlinFirmware/Configurations/archive/refs/tags/2.1.2.5.zip -O configs.zip
-          unzip -q configs.zip
-          echo "✅ Configurations 2.1.2.5 downloaded"
-
-      - name: Copy Monster8 Configs
-        run: |
-          CONFIG_SRC="Configurations-2.1.2.5/config/examples/Mks"
-          MONSTER_DIR=$(find "$CONFIG_SRC" -type d -name "*Monster*" | head -1)
-
-          if [ -z "$MONSTER_DIR" ]; then
-            echo "❌ Monster8 directory not found!"
-            ls -la "$CONFIG_SRC"
-            exit 1
-          fi
-
-          echo "✅ Found Monster8 at: $MONSTER_DIR"
-          cp "$MONSTER_DIR/Configuration.h" Marlin/Marlin/Configuration.h
-          cp "$MONSTER_DIR/Configuration_adv.h" Marlin/Marlin/Configuration_adv.h
-
-      - name: Apply Bioprinter Patches
-        run: |
-          cd Marlin/Marlin
-
-          # Use a flexible sed pattern that handles leading whitespace
-          patch() { sed -i "s|.*#define $1 .*|#define $1 $2|" Configuration.h; }
-          patch_adv() { sed -i "s|.*#define $1 .*|#define $1 $2|" Configuration_adv.h; }
-
-          # Board
-          sed -i 's|.*#define MOTHERBOARD.*|#define MOTHERBOARD BOARD_MKS_MONSTER8|' Configuration.h
-
-          # Bed size
-          patch X_BED_SIZE 200
-          patch Y_BED_SIZE 200
-          sed -i 's|.*#define Z_MAX_POS.*|#define Z_MAX_POS 100|' Configuration.h
-
-          # Dummy temperature sensors (998 = always 25°C, 0 = disabled)
-          sed -i 's|.*#define TEMP_SENSOR_0 .*|#define TEMP_SENSOR_0 998|' Configuration.h
-          sed -i 's|.*#define TEMP_SENSOR_1 .*|#define TEMP_SENSOR_1 0|'   Configuration.h
-          sed -i 's|.*#define TEMP_SENSOR_BED .*|#define TEMP_SENSOR_BED 0|' Configuration.h
-          sed -i 's|.*#define TEMP_SENSOR_CHAMBER .*|#define TEMP_SENSOR_CHAMBER 0|' Configuration.h
-
-          # Disable cold extrusion
-          sed -i 's|.*#define PREVENT_COLD_EXTRUSION.*|//#define PREVENT_COLD_EXTRUSION|' Configuration.h
-          sed -i 's|.*#define PREVENT_LENGTHY_EXTRUDE.*|//#define PREVENT_LENGTHY_EXTRUDE|' Configuration.h
-
-          # Disable PID (match the line loosely)
-          sed -i '/^[[:space:]]*#define PIDTEMP[^_]/s|#define|//#define|' Configuration.h
-          sed -i '/^[[:space:]]*#define PIDTEMPBED/s|#define|//#define|'  Configuration.h
-
-          # Enable custom bootscreen
-          sed -i 's|.*#define SHOW_CUSTOM_BOOTSCREEN.*|#define SHOW_CUSTOM_BOOTSCREEN|' Configuration.h
-          # If the line doesn't exist at all, append it
-          grep -q "SHOW_CUSTOM_BOOTSCREEN" Configuration.h || echo "#define SHOW_CUSTOM_BOOTSCREEN" >> Configuration.h
-
-          # Disable thermal protection
-          sed -i 's|.*#define THERMAL_PROTECTION_HOTENDS.*|//#define THERMAL_PROTECTION_HOTENDS|' Configuration_adv.h
-          sed -i 's|.*#define THERMAL_PROTECTION_BED.*|//#define THERMAL_PROTECTION_BED|'         Configuration_adv.h
-          sed -i 's|.*#define THERMAL_PROTECTION_CHAMBER.*|//#define THERMAL_PROTECTION_CHAMBER|' Configuration_adv.h
-          sed -i 's|.*#define THERMAL_PROTECTION_COOLER.*|//#define THERMAL_PROTECTION_COOLER|'   Configuration_adv.h
-
-          echo "=== Verification ==="
-          grep -E "(MOTHERBOARD|X_BED_SIZE|Y_BED_SIZE|Z_MAX_POS|TEMP_SENSOR_0|PREVENT_COLD|PIDTEMP|SHOW_CUSTOM)" Configuration.h | grep -v "//" || true
-          grep "THERMAL_PROTECTION" Configuration_adv.h || true
-
-      - name: Add Custom Bootscreen
-        run: |
-          # ✅ No mkdir here — cat creates the file directly
-          cat > Marlin/Marlin/_Bootscreen.h << 'EOF'
-          /**
-           * Custom Bootscreen for HASSI Bioprinter
-           * 128x64 pixels for MKS MINI12864 V3
-           */
-          #pragma once
-          #define CUSTOM_BOOTSCREEN_TIMEOUT 4000
-          #define CUSTOM_BOOTSCREEN_BMPWIDTH  128
-          #define CUSTOM_BOOTSCREEN_BMPHEIGHT 64
-          const unsigned char custom_bootscreen_bmp[] PROGMEM = {
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            // ... rest of your bitmap data ...
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-          };
-          EOF
-          echo "✅ Custom bootscreen written"
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -123,15 +37,13 @@ jobs:
         run: |
           BIN_DIR="Marlin/.pio/build/mks_monster8"
           ls -lh "$BIN_DIR/"
-
           BIN_FILE=$(find "$BIN_DIR" -name "*.bin" | head -1)
           if [ -z "$BIN_FILE" ]; then
             echo "❌ No .bin file found!"
             exit 1
           fi
-
           cp "$BIN_FILE" "hassi_bioprinter_mks_monster8_v2.bin"
-          echo "✅ Binary ready: hassi_bioprinter_mks_monster8_v2.bin"
+          echo "✅ Binary ready"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -145,12 +57,7 @@ jobs:
           tag_name: bioprinter-v${{ github.run_number }}
           name: HASSI Bioprinter MKS Monster8 V2 - Build ${{ github.run_number }}
           body: |
-            **Board:** MKS Monster8 V2
-            **Bed:** 200x200x100mm
-            **Temperature:** Disabled (dummy sensors)
-            **Thermal Protection:** Disabled
-            **Cold Extrusion:** Disabled
-            **Display:** MKS MINI12864 V3 with custom bootscreen
+            Default Marlin 2.1.2.5 build for MKS Monster8 V2
           files: hassi_bioprinter_mks_monster8_v2.bin
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
