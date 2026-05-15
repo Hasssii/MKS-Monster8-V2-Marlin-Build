@@ -18,6 +18,12 @@ jobs:
           mv Marlin-2.1.2.5 Marlin
           echo "✅ Marlin 2.1.2.5 downloaded"
 
+      - name: Set Motherboard
+        run: |
+          sed -i 's|.*#define MOTHERBOARD.*|#define MOTHERBOARD BOARD_MKS_MONSTER8|' Marlin/Marlin/Configuration.h
+          echo "=== Motherboard check ==="
+          grep "MOTHERBOARD" Marlin/Marlin/Configuration.h
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -43,7 +49,7 @@ jobs:
             exit 1
           fi
           cp "$BIN_FILE" "hassi_bioprinter_mks_monster8_v2.bin"
-          echo "✅ Binary ready"
+          echo "✅ Binary ready: hassi_bioprinter_mks_monster8_v2.bin"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -57,7 +63,8 @@ jobs:
           tag_name: bioprinter-v${{ github.run_number }}
           name: HASSI Bioprinter MKS Monster8 V2 - Build ${{ github.run_number }}
           body: |
-            Default Marlin 2.1.2.5 build for MKS Monster8 V2
+            **Board:** MKS Monster8 V2
+            Default Marlin 2.1.2.5 build — motherboard only change
           files: hassi_bioprinter_mks_monster8_v2.bin
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
