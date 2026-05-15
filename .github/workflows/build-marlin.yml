@@ -18,11 +18,19 @@ jobs:
           mv Marlin-2.1.2.5 Marlin
           echo "✅ Marlin 2.1.2.5 downloaded"
 
-      - name: Set Motherboard
+      - name: Set Motherboard and Serial
         run: |
+          # Fix motherboard
           sed -i 's|.*#define MOTHERBOARD.*|#define MOTHERBOARD BOARD_MKS_MONSTER8_V2|' Marlin/Marlin/Configuration.h
-          echo "=== Motherboard check ==="
-          grep "MOTHERBOARD" Marlin/Marlin/Configuration.h
+
+          # Fix serial port (STM32 needs port 1, not 0)
+          sed -i 's|.*#define SERIAL_PORT .*|#define SERIAL_PORT 1|' Marlin/Marlin/Configuration.h
+
+          # Disable second serial port to avoid conflicts
+          sed -i 's|.*#define SERIAL_PORT_2 .*|#define SERIAL_PORT_2 -1|' Marlin/Marlin/Configuration.h
+
+          echo "=== Verification ==="
+          grep -E "MOTHERBOARD|SERIAL_PORT" Marlin/Marlin/Configuration.h
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -64,7 +72,8 @@ jobs:
           name: HASSI Bioprinter MKS Monster8 V2 - Build ${{ github.run_number }}
           body: |
             **Board:** MKS Monster8 V2
-            Default Marlin 2.1.2.5 build — motherboard only change
+            **Marlin:** 2.1.2.5
+            **Serial Port:** 1 (STM32 fix)
           files: hassi_bioprinter_mks_monster8_v2.bin
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
