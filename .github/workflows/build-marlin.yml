@@ -20,15 +20,9 @@ jobs:
 
       - name: Set Motherboard and Serial
         run: |
-          # Fix motherboard
           sed -i 's|.*#define MOTHERBOARD.*|#define MOTHERBOARD BOARD_MKS_MONSTER8_V2|' Marlin/Marlin/Configuration.h
-
-          # Fix serial port (STM32 needs port 1, not 0)
           sed -i 's|.*#define SERIAL_PORT .*|#define SERIAL_PORT 1|' Marlin/Marlin/Configuration.h
-
-          # Disable second serial port to avoid conflicts
           sed -i 's|.*#define SERIAL_PORT_2 .*|#define SERIAL_PORT_2 -1|' Marlin/Marlin/Configuration.h
-
           echo "=== Verification ==="
           grep -E "MOTHERBOARD|SERIAL_PORT" Marlin/Marlin/Configuration.h
 
@@ -50,14 +44,37 @@ jobs:
       - name: Verify & Rename Binary
         run: |
           BIN_DIR="Marlin/.pio/build/mks_monster8"
-          ls -lh "$BIN_DIR/"
-          BIN_FILE=$(find "$BIN_DIR" -name "*.bin" | head -1)
+
+          echo "=== ALL files in build dir ==="
+          find "$BIN_DIR" -type f | sort
+          echo ""
+          echo "=== ALL .bin files with sizes ==="
+          find "$BIN_DIR" -name "*.bin" -exec ls -lh {} \;
+          echo ""
+          echo "=== ALL .elf files with sizes ==="
+          find "$BIN_DIR" -name "*.elf" -exec ls -lh {} \;
+
+          # Pick largest .bin file (not the smallest/bootloader)
+          BIN_FILE=$(find "$BIN_DIR" -name "*.bin" -exec ls -s {} \; | sort -n | tail -1 | awk '{print $2}')
+
           if [ -z "$BIN_FILE" ]; then
             echo "❌ No .bin file found!"
             exit 1
           fi
+
+          SIZE=$(ls -lh "$BIN_FILE" | awk '{print $5}')
+          echo "✅ Selected binary: $BIN_FILE ($SIZE)"
+
+          # Sanity check — Marlin should be at least 200KB
+          SIZE_BYTES=$(stat -c%s "$BIN_FILE")
+          if [ "$SIZE_BYTES" -lt 200000 ]; then
+            echo "⚠️  WARNING: Binary is only ${SIZE_BYTES} bytes — expected 300KB+"
+            echo "This may be a bootloader, not firmware!"
+            exit 1
+          fi
+
           cp "$BIN_FILE" "hassi_bioprinter_mks_monster8_v2.bin"
-          echo "✅ Binary ready: hassi_bioprinter_mks_monster8_v2.bin"
+          echo "✅ Binary ready: hassi_bioprinter_mks_monster8_v2.bin ($SIZE)"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
