@@ -18,13 +18,60 @@ jobs:
           mv Marlin-2.1.2.5 Marlin
           echo "✅ Marlin 2.1.2.5 downloaded"
 
-      - name: Set Motherboard and Serial
+      - name: Apply Bioprinter Patches
         run: |
-          sed -i 's|.*#define MOTHERBOARD.*|#define MOTHERBOARD BOARD_MKS_MONSTER8_V2|' Marlin/Marlin/Configuration.h
-          sed -i 's|.*#define SERIAL_PORT .*|#define SERIAL_PORT 1|' Marlin/Marlin/Configuration.h
-          sed -i 's|.*#define SERIAL_PORT_2 .*|#define SERIAL_PORT_2 -1|' Marlin/Marlin/Configuration.h
+          cd Marlin/Marlin
+
+          # ── Board & Serial ──────────────────────────────────────────
+          sed -i 's|.*#define MOTHERBOARD.*|#define MOTHERBOARD BOARD_MKS_MONSTER8_V2|' Configuration.h
+          sed -i 's|.*#define SERIAL_PORT .*|#define SERIAL_PORT 1|' Configuration.h
+          sed -i 's|.*#define SERIAL_PORT_2 .*|#define SERIAL_PORT_2 -1|' Configuration.h
+
+          # ── Bed Size 200x200x200 ────────────────────────────────────
+          sed -i 's|.*#define X_BED_SIZE.*|#define X_BED_SIZE 200|' Configuration.h
+          sed -i 's|.*#define Y_BED_SIZE.*|#define Y_BED_SIZE 200|' Configuration.h
+          sed -i 's|.*#define Z_MAX_POS.*|#define Z_MAX_POS 200|' Configuration.h
+
+          # ── Disable ALL Temperature Sensors ────────────────────────
+          # 998 = dummy sensor, always reports 25°C so Marlin won't complain
+          sed -i 's|.*#define TEMP_SENSOR_0 .*|#define TEMP_SENSOR_0 998|' Configuration.h
+          sed -i 's|.*#define TEMP_SENSOR_1 .*|#define TEMP_SENSOR_1 0|' Configuration.h
+          sed -i 's|.*#define TEMP_SENSOR_2 .*|#define TEMP_SENSOR_2 0|' Configuration.h
+          sed -i 's|.*#define TEMP_SENSOR_3 .*|#define TEMP_SENSOR_3 0|' Configuration.h
+          sed -i 's|.*#define TEMP_SENSOR_4 .*|#define TEMP_SENSOR_4 0|' Configuration.h
+          sed -i 's|.*#define TEMP_SENSOR_BED .*|#define TEMP_SENSOR_BED 0|' Configuration.h
+          sed -i 's|.*#define TEMP_SENSOR_PROBE .*|#define TEMP_SENSOR_PROBE 0|' Configuration.h
+          sed -i 's|.*#define TEMP_SENSOR_CHAMBER .*|#define TEMP_SENSOR_CHAMBER 0|' Configuration.h
+          sed -i 's|.*#define TEMP_SENSOR_COOLER .*|#define TEMP_SENSOR_COOLER 0|' Configuration.h
+
+          # ── Disable Thermal Protection ──────────────────────────────
+          sed -i 's|.*#define THERMAL_PROTECTION_HOTENDS.*|//#define THERMAL_PROTECTION_HOTENDS|' Configuration_adv.h
+          sed -i 's|.*#define THERMAL_PROTECTION_BED.*|//#define THERMAL_PROTECTION_BED|' Configuration_adv.h
+          sed -i 's|.*#define THERMAL_PROTECTION_CHAMBER.*|//#define THERMAL_PROTECTION_CHAMBER|' Configuration_adv.h
+          sed -i 's|.*#define THERMAL_PROTECTION_COOLER.*|//#define THERMAL_PROTECTION_COOLER|' Configuration_adv.h
+
+          # ── Disable PID (no heaters needed) ────────────────────────
+          sed -i '/^[[:space:]]*#define PIDTEMP[^_]/s|#define|//#define|' Configuration.h
+          sed -i '/^[[:space:]]*#define PIDTEMPBED/s|#define|//#define|' Configuration.h
+
+          # ── Syringe Pump — disable cold extrusion checks ───────────
+          # Syringe has no heat so we must allow extrusion at any temp
+          sed -i 's|.*#define PREVENT_COLD_EXTRUSION.*|//#define PREVENT_COLD_EXTRUSION|' Configuration.h
+          sed -i 's|.*#define PREVENT_LENGTHY_EXTRUDE.*|//#define PREVENT_LENGTHY_EXTRUDE|' Configuration.h
+
+          # ── Syringe Pump — extruder steps/mm ───────────────────────
+          # Default 93 steps/mm is for filament — syringe needs higher value
+          # 837 steps/mm is a common starting point for syringe, tune later
+          sed -i 's|.*#define DEFAULT_AXIS_STEPS_PER_UNIT.*|#define DEFAULT_AXIS_STEPS_PER_UNIT { 80, 80, 400, 837 }|' Configuration.h
+
+          # ── Syringe Pump — allow long extrusions ───────────────────
+          sed -i 's|.*#define EXTRUDE_MAXLENGTH.*|#define EXTRUDE_MAXLENGTH 500|' Configuration_adv.h
+
           echo "=== Verification ==="
-          grep -E "MOTHERBOARD|SERIAL_PORT" Marlin/Marlin/Configuration.h
+          echo "--- Configuration.h ---"
+          grep -E "MOTHERBOARD|SERIAL_PORT|BED_SIZE|Z_MAX_POS|TEMP_SENSOR_0|TEMP_SENSOR_BED|PREVENT_COLD|PIDTEMP|STEPS_PER_UNIT" Configuration.h
+          echo "--- Configuration_adv.h ---"
+          grep -E "THERMAL_PROTECTION|EXTRUDE_MAXLENGTH" Configuration_adv.h
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -46,32 +93,17 @@ jobs:
           BIN_DIR="Marlin/.pio/build/mks_monster8"
           ELF_FILE="$BIN_DIR/firmware.elf"
 
-          echo "=== All build files ==="
-          find "$BIN_DIR" -maxdepth 1 -type f | sort
-          echo ""
-
           if [ ! -f "$ELF_FILE" ]; then
             echo "❌ firmware.elf not found!"
             exit 1
           fi
 
-          ELF_SIZE=$(ls -lh "$ELF_FILE" | awk '{print $5}')
-          echo "✅ Found firmware.elf ($ELF_SIZE)"
+          echo "✅ Found firmware.elf ($(ls -lh $ELF_FILE | awk '{print $5}'))"
 
-          # Install ARM toolchain
           sudo apt-get install -y -q gcc-arm-none-eabi
-
-          # Convert ELF to BIN
           arm-none-eabi-objcopy -O binary "$ELF_FILE" "hassi_bioprinter_mks_monster8_v2.bin"
 
-          FINAL_SIZE=$(ls -lh "hassi_bioprinter_mks_monster8_v2.bin" | awk '{print $5}')
-          SIZE_BYTES=$(stat -c%s "hassi_bioprinter_mks_monster8_v2.bin")
-          echo "✅ Binary produced: hassi_bioprinter_mks_monster8_v2.bin"
-          echo "   Size: $FINAL_SIZE ($SIZE_BYTES bytes)"
-
-          # Print section sizes from ELF for info
-          echo ""
-          echo "=== ELF section sizes ==="
+          echo "✅ Binary: $(ls -lh hassi_bioprinter_mks_monster8_v2.bin | awk '{print $5}')"
           arm-none-eabi-size "$ELF_FILE"
 
       - name: Upload Artifact
@@ -88,7 +120,13 @@ jobs:
           body: |
             **Board:** MKS Monster8 V2
             **Marlin:** 2.1.2.5
-            **Serial Port:** 1 (STM32 fix)
+            **Bed:** 200 x 200 x 200 mm
+            **Extruder:** Syringe pump (steps/mm: 837 — tune as needed)
+            **Temperature:** All sensors disabled (dummy 998)
+            **Thermal Protection:** Disabled
+            **Cold Extrusion:** Disabled
+            **PID:** Disabled
+            **Max Extrude Length:** 500mm
           files: hassi_bioprinter_mks_monster8_v2.bin
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
