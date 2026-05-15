@@ -20,7 +20,7 @@ jobs:
 
       - name: Set Motherboard
         run: |
-          sed -i 's|.*#define MOTHERBOARD.*|#define MOTHERBOARD BOARD_MKS_MONSTER8|' Marlin/Marlin/Configuration.h
+          sed -i 's|.*#define MOTHERBOARD.*|#define MOTHERBOARD BOARD_MKS_MONSTER8_V2|' Marlin/Marlin/Configuration.h
           echo "=== Motherboard check ==="
           grep "MOTHERBOARD" Marlin/Marlin/Configuration.h
 
